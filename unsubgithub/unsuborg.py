@@ -10,7 +10,7 @@ import re
 import json
 from requests.auth import HTTPBasicAuth
 import os
-# from pprint import pprint
+from pprint import pprint
 
 import sys
 if sys.version_info >= (3, 6):
@@ -100,7 +100,7 @@ while True:
             subpath = urlparse(repo["subscription_url"]).path
             subinfo = authget(subpath, None)
             if not subinfo['ignored']:
-                m = re.search("/([^/]+)$", subpath)
+                m = re.search("/([^/]+)/[^/]+$", subpath)
                 if m is None:
                     raise ValueError("Badly formed path to repo: {}".format(subpath))
                 reponame = m.group(1)
