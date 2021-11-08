@@ -89,7 +89,7 @@ numrepo = 0
 numignored = 0
 setignored = 0
 while True:
-    print("Getting page {}".format(page))
+    print("Getting page {} on {}".format(page, org))
     result = authget("/orgs/{}/repos".format(org), {"per_page": "50", "page": page})
     if len(result) == 0:
         break
