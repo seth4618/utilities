@@ -1,7 +1,10 @@
 #!/usr/bin/env python
 
-# will unsubscribe from notifications from all repos in an organization.
-# requires a "personal access token" from github.  Goto settings, developer settings, personal access token to get one
+# will unsubscribe from notifications from all repos in an
+# organization.  requires a "personal access token" from github.  Goto
+# settings, developer settings, personal access token to get one if
+# you have env var set GITUNSUB to a path, it will keep track of last
+# page fetched from an org and start
 
 
 import requests
@@ -10,6 +13,7 @@ import re
 import json
 from requests.auth import HTTPBasicAuth
 import os
+import errno
 from pprint import pprint
 
 import sys
@@ -26,10 +30,16 @@ def die(msg):
 
 ################################################################
 # setup arguments
-parser = argparse.ArgumentParser(description='get all repos and subsription status for an org')
+parser = argparse.ArgumentParser(description='get all repos and ignore message for each for an org',
+                                 epilog='''
+
+                                 preforms actions on behalf of user defined in environment variable GITHUB_USER.
+                                 It uses the the token defined by GITHUB_PERSONAL_ACCESS_TOKEN.
+                                 If GITHUB_UNSUB is defined to a file path, will store last page acted on in the file
+                                 and by default will start searching next time from this page.  On ubuntu GITHUB_UNSUB=~/.config/githubunsub/lastpage.json would be a reasonable definition.''')
 parser.add_argument("-v", "--verbosity", action="count", default=0, help="increase output verbosity")
 parser.add_argument("-o", "--org", default="cmu15213f21", help="org to work on")
-parser.add_argument("-s", "--start", type=int, default=1, help="page to start at")
+parser.add_argument("-s", "--start", type=int, default=0, help="page to start at")
 parser.add_argument("-u", "--user", default="", help="github user (overrides environment)")
 parser.add_argument("-t", "--token", default="", help="github token (overrides environment")
 flags = parser.parse_args()
@@ -49,6 +59,18 @@ if len(token) == 0:
     token = os.getenv("GITHUB_PERSONAL_ACCESS_TOKEN")
     if token is None:
         die("No token specified, please set GITHUB_PERSONAL_ACCESS_TOKEN or use -t")
+
+# see if we are tracking orgs, if so then use last page fetched as default start point
+tracking = os.getenv("GITHUB_UNSUB")
+unsubTracking = {}
+if tracking is not None:
+    if os.path.exists(tracking):
+        unsubTracking = json.load(open(tracking, "r"))
+    if (startPage == 0) and (org in unsubTracking):
+        startPage = unsubTracking[org]
+# we didn't set start on command line or find info in tracking file
+if startPage == 0:
+    startPage = 1
 
 
 # exception raised if we get a 404 from github api
@@ -118,3 +140,15 @@ while True:
     page += 1
 
 print("Repos: {}, already ignored: {}, set to ignored: {}".format(numrepo, numignored, setignored))
+
+# if we are tracking, save info
+if tracking is not None:
+    unsubTracking[org] = page - 1
+    try:
+        os.makedirs(os.path.dirname(tracking))  # make sure directory exists for file
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            print("Failed to create the tracking directory:{}".format(tracking))
+            raise e
+    with open(tracking, "w") as f:
+        f.write(json.dumps(unsubTracking))
